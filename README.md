@@ -1,3 +1,11 @@
+This Fork:
+===================
+
+Includes a new type for qrencode: "CBASIC". This type will output a small BASIC file with the QR Code data that will output a QR Code using CoCo semigraphics.
+
+```./qrencode -m0 -t CBASIC [url]```
+
+---
 # libqrencode - a fast and compact QR Code encoding library [![Build Status](https://travis-ci.org/fukuchi/libqrencode.png?branch=master)](https://travis-ci.org/fukuchi/libqrencode)
 
 **Attention:** This repository contains the development version of libqrencode. See <https://fukuchi.org/works/qrencode/> for the official stable releases. At this moment, the latest stable release is version 4.1.1.

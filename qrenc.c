@@ -68,7 +68,8 @@ enum imageType {
 	ANSIUTF8_TYPE,
 	ANSI256UTF8_TYPE,
 	UTF8i_TYPE,
-	ANSIUTF8i_TYPE
+	ANSIUTF8i_TYPE,
+    BASICLANG_TYPE
 };
 
 static enum imageType image_type = PNG_TYPE;
@@ -929,6 +930,91 @@ static int writeUTF8(const QRcode *qrcode, const char *outfile, int use_ansi, in
 	return 0;
 }
 
+static int writeBASIC(const QRcode *qrcode, const char *outfile, int basictype, int color)
+{
+    FILE *fp;
+    int x, y;
+    char buff[6];
+    buff[6-1] = '\0';
+    const char *empty, *full;
+
+    full = "0,";
+    empty = "15,";
+
+    if (color == 0) {
+        /* default is white */
+        color = 5;
+    }
+    color --;
+    color *= 16;
+
+    /* Convert to Coco semigraphics character as 4 inverted bits ordered:
+     Bit    qrcode location
+     3;2 =  x,y;  x+1,y
+     1;0    x,y+1;x+1,y+1
+    */
+    
+    fp = openFile(outfile);
+    
+    /* data */
+    for(y = 0; y < qrcode->width; y += 2) {
+        unsigned char *row1, *row2;
+        row1 = qrcode->data + y*qrcode->width;
+        row2 = row1 + qrcode->width;
+
+        snprintf(buff, 4, "%d ", y+1);
+        fputs(buff, fp);
+        fputs("DATA 15,", fp);
+
+        for (x = 0; x < margin; x+=2) {
+            fputs(empty, fp);
+        }
+
+        for (x = 0; x < qrcode->width; x += 2) {
+            unsigned int data = 0x00;
+            data |= !(row1[x] & 1);
+            data <<= 1;
+            if (x+1 < qrcode->width)
+                data |= !(row1[x+1] & 1);
+            else
+                data |= 0x01;
+            data <<= 1;
+            
+            data |= !(row2[x] & 1);
+            data <<= 1;
+            
+            if (x+1 < qrcode->width)
+                data |= !(row2[x+1] & 1);
+            else
+                data |= 0x01;
+            
+            snprintf(buff, 5, "%d,", data);
+            fputs(buff, fp);
+        }
+        
+        for (x = 0; x < margin; x += 2)
+            fputs(empty, fp);
+
+        fputs("16", fp);
+        fputc('\n', fp);
+    }
+    snprintf(buff, 4, "%d ", y++);
+    fputs(buff, fp);
+
+    fputs("DATA 127\n", fp);
+    
+    fputs("50 READ A\n", fp);
+    fputs("60 IF A<16 THEN A=A+",fp);
+    
+    snprintf(buff, 5, "%d", 128+color);
+    fputs(buff, fp);
+
+    fputs(": PRINT CHR$(A);: GOTO 50\n", fp);
+    fputs("70 IF A<127 THEN PRINT \"\": GOTO 50\n100 END\nRUN\n", fp);
+    fclose(fp);
+    return 0;
+}
+
 static void writeASCII_margin(FILE* fp, int realwidth, char* buffer, int invert)
 {
 	int y, h;
@@ -1088,6 +1174,9 @@ static void qrencode(const unsigned char *intext, int length, const char *outfil
 		case ANSIUTF8i_TYPE:
 			writeUTF8(qrcode, outfile, 1, 1);
 			break;
+        case BASICLANG_TYPE:
+            writeBASIC(qrcode, outfile, 0, 0);
+            break;
 		default:
 			fprintf(stderr, "Unknown image type.\n");
 			exit(EXIT_FAILURE);
@@ -1346,6 +1435,8 @@ int main(int argc, char **argv)
 					image_type = UTF8i_TYPE;
 				} else if(strcasecmp(optarg, "ansiutf8i") == 0) {
 					image_type = ANSIUTF8i_TYPE;
+                } else if(strcasecmp(optarg, "CBASIC") == 0) {
+                    image_type = BASICLANG_TYPE;
 				} else {
 					fprintf(stderr, "Invalid image type: %s\n", optarg);
 					exit(EXIT_FAILURE);
