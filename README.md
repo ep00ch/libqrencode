@@ -1,9 +1,15 @@
 This Fork:
 ===================
 
-Includes a new type for qrencode: "CBASIC". This type will output a small BASIC file with the QR Code data that will output a QR Code using CoCo semigraphics.
+Includes two new Coco TRS-80 centric types for qrencode: "CBASIC" and "CASM"". 
+
+CBASIC type will output a small BASIC file with the QR Code data that will output a QR Code using CoCo semigraphics.
 
 ```./qrencode -m0 -t CBASIC [url]```
+
+CASM type will output assembler data directives with the QR Code data as CoCo semigraphics. The margin setting affects the assembly code indent, as the displayed indent would likely be done programatically.
+
+```./qrencode -m4 -t CASM [url]```
 
 ---
 # libqrencode - a fast and compact QR Code encoding library [![Build Status](https://travis-ci.org/fukuchi/libqrencode.png?branch=master)](https://travis-ci.org/fukuchi/libqrencode)

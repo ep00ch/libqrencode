@@ -69,7 +69,8 @@ enum imageType {
 	ANSI256UTF8_TYPE,
 	UTF8i_TYPE,
 	ANSIUTF8i_TYPE,
-    BASICLANG_TYPE
+    BASICLANG_TYPE,
+    ASMLANG_TYPE
 };
 
 static enum imageType image_type = PNG_TYPE;
@@ -1015,6 +1016,76 @@ static int writeBASIC(const QRcode *qrcode, const char *outfile, int basictype, 
     return 0;
 }
 
+static int writeASM(const QRcode *qrcode, const char *outfile, int basictype, int color)
+{
+    FILE *fp;
+    int x, y;
+    char empty, full;
+
+    const char fcbstr[] = "FCB  ";
+    
+    if (color == 0) {
+        /* default is white */
+        color = 5;
+    }
+    color --;
+    color *= 16;
+    // Make color the entire offset from 0 to the semigraphics characters.
+    color |= 0x80;
+    
+    empty = color + 0x0F;
+    full = color;
+    
+    /* Convert to Coco semigraphics character as 4 inverted bits ordered:
+     Bit    qrcode location
+     3;2 =  x,y;  x+1,y
+     1;0    x,y+1;x+1,y+1
+    */
+
+    fp = openFile(outfile);
+
+    /* data */
+    for(y = 0; y < qrcode->width; y += 2) {
+        unsigned char *row1, *row2;
+        row1 = qrcode->data + y*qrcode->width;
+        row2 = row1 + qrcode->width;
+
+        // Make the margin the indent of the code. Programmers are picky about this stuff!
+        fprintf(fp, "%*s%s", margin, "", fcbstr);
+
+        for (x = 0; x < qrcode->width; x += 2) {
+            unsigned int data = 0x00;
+            // Shift in the upper left bit.
+            data |= !(row1[x] & 1);
+            data <<= 1;
+            // Shift in the upper right bit, unless we are already to the right side.
+            if (x+1 < qrcode->width)
+                data |= !(row1[x+1] & 1);
+            else
+                data |= 0x01;
+            data <<= 1;
+            // Shift in the lower left bit.
+            data |= !(row2[x] & 1);
+            data <<= 1;
+            // Shift in the lower right bit, unless we are already to the right side.
+            if (x+1 < qrcode->width)
+                data |= !(row2[x+1] & 1);
+            else
+                data |= 0x01;
+            
+            // Add the color offset and offset from 0;
+            data |= color;
+
+            fprintf(fp, "$%X,", data);
+        }
+        
+        fputs("$00\n",fp);
+    }
+  
+    fclose(fp);
+    return 0;
+}
+
 static void writeASCII_margin(FILE* fp, int realwidth, char* buffer, int invert)
 {
 	int y, h;
@@ -1176,6 +1247,9 @@ static void qrencode(const unsigned char *intext, int length, const char *outfil
 			break;
         case BASICLANG_TYPE:
             writeBASIC(qrcode, outfile, 0, 0);
+            break;
+        case ASMLANG_TYPE:
+            writeASM(qrcode, outfile, 0, 0);
             break;
 		default:
 			fprintf(stderr, "Unknown image type.\n");
@@ -1437,6 +1511,8 @@ int main(int argc, char **argv)
 					image_type = ANSIUTF8i_TYPE;
                 } else if(strcasecmp(optarg, "CBASIC") == 0) {
                     image_type = BASICLANG_TYPE;
+                } else if(strcasecmp(optarg, "CASM") == 0) {
+                    image_type = ASMLANG_TYPE;
 				} else {
 					fprintf(stderr, "Invalid image type: %s\n", optarg);
 					exit(EXIT_FAILURE);
