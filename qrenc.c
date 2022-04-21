@@ -935,8 +935,6 @@ static int writeBASIC(const QRcode *qrcode, const char *outfile, int basictype, 
 {
     FILE *fp;
     int x, y;
-    char buff[6];
-    buff[6-1] = '\0';
     const char *empty, *full;
 
     full = "0,";
@@ -948,7 +946,9 @@ static int writeBASIC(const QRcode *qrcode, const char *outfile, int basictype, 
     }
     color --;
     color *= 16;
-
+    // Make color the entire offset from 0 to the semigraphics characters.
+    color |= 0x80;
+    
     /* Convert to Coco semigraphics character as 4 inverted bits ordered:
      Bit    qrcode location
      3;2 =  x,y;  x+1,y
@@ -963,9 +963,7 @@ static int writeBASIC(const QRcode *qrcode, const char *outfile, int basictype, 
         row1 = qrcode->data + y*qrcode->width;
         row2 = row1 + qrcode->width;
 
-        snprintf(buff, 4, "%d ", y+1);
-        fputs(buff, fp);
-        fputs("DATA 15,", fp);
+        fprintf(fp, "%d DATA 15,", y+1);
 
         for (x = 0; x < margin; x+=2) {
             fputs(empty, fp);
@@ -989,29 +987,21 @@ static int writeBASIC(const QRcode *qrcode, const char *outfile, int basictype, 
             else
                 data |= 0x01;
             
-            snprintf(buff, 5, "%d,", data);
-            fputs(buff, fp);
+            fprintf(fp, "%d,", data);
         }
         
         for (x = 0; x < margin; x += 2)
             fputs(empty, fp);
 
-        fputs("16", fp);
-        fputc('\n', fp);
+        fputs("16\n", fp);
     }
-    snprintf(buff, 4, "%d ", y++);
-    fputs(buff, fp);
 
-    fputs("DATA 127\n", fp);
+    fprintf(fp, "%d DATA 127\n", y+1);
     
     fputs("50 READ A\n", fp);
-    fputs("60 IF A<16 THEN A=A+",fp);
-    
-    snprintf(buff, 5, "%d", 128+color);
-    fputs(buff, fp);
-
-    fputs(": PRINT CHR$(A);: GOTO 50\n", fp);
+    fprintf(fp, "60 IF A<16 THEN A=A+%d: PRINT CHR$(A);: GOTO 50\n", color);
     fputs("70 IF A<127 THEN PRINT \"\": GOTO 50\n100 END\nRUN\n", fp);
+ 
     fclose(fp);
     return 0;
 }
